@@ -1,17 +1,31 @@
-export const categories = ['Económico', 'Confort', 'XL', 'Premium'];
+export const categories = [
+  'Económico',
+  'Comfort',
+  'XL',
+  'Premium'
+];
 
 export const colors = [
   'Blanco',
   'Negro',
   'Gris',
-  'Plata',
+  'Plateado',
   'Rojo',
   'Azul',
   'Verde',
   'Amarillo',
   'Naranja',
+  'Otro'
 ];
 
-export const genders = ['Masculino', 'Femenino', 'Otro'];
+export const genders = [
+  'Femenino',
+  'Masculino',
+  'Otro'
+];
 
-export const languages = ['Español', 'Inglés', 'Portugués'];
+export const languages = [
+  'Español',
+  'Inglés',
+  'Portugués'
+];
