@@ -2,20 +2,37 @@ import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../theme/colors';
 
-export default function PhotoPicker({ label, value, onChange, error, vehicle = false }) {
+export default function PhotoPicker({
+  label,
+  value,
+  onChange,
+  error,
+  vehicle = false,
+  document = false,
+}) {
   const choosePhoto = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permiso requerido', 'Permite el acceso a tus fotos para continuar.');
-      return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Permiso requerido',
+          'Permite el acceso a tus fotos en la configuración para continuar.'
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.75,
+        allowsEditing: !vehicle && !document,
+        aspect: !vehicle && !document ? [1, 1] : undefined,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        onChange(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.warn('Error al seleccionar imagen:', err);
+      Alert.alert('Error', 'No se pudo abrir la galería de fotos.');
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.75,
-      allowsEditing: !vehicle,
-      aspect: vehicle ? undefined : [1, 1],
-    });
-    if (!result.canceled) onChange(result.assets[0].uri);
   };
 
   return (
@@ -27,11 +44,15 @@ export default function PhotoPicker({ label, value, onChange, error, vehicle = f
         ) : (
           <>
             <View style={styles.camera}>
-              <Text style={styles.cameraIcon}>▣</Text>
+              <Text style={styles.cameraIcon}>📷</Text>
             </View>
             <Text style={styles.add}>Agregar foto</Text>
             <Text style={styles.hint}>
-              {vehicle ? 'Debe verse claramente la placa' : 'Desde tu galeria'}
+              {document
+                ? 'Foto nítida y legible del documento'
+                : vehicle
+                ? 'Debe verse claramente la placa'
+                : 'Desde tu galería'}
             </Text>
           </>
         )}
@@ -69,7 +90,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cameraIcon: { fontSize: 18, color: colors.black },
+  cameraIcon: { fontSize: 16 },
   add: { marginTop: 7, fontSize: 14, fontWeight: '700' },
   hint: { marginTop: 3, fontSize: 12, color: colors.muted },
   error: { color: colors.error, fontSize: 12, marginTop: 5 },
