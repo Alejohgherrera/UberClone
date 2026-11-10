@@ -1,15 +1,3 @@
-export const genders = [
-  'Femenino',
-  'Masculino',
-  'Otro'
-];
-
-export const languages = [
-  'Español',
-  'Inglés',
-  'Portugués'
-];
-
 export const categories = [
   'Económico',
   'Comfort',
@@ -28,4 +16,16 @@ export const colors = [
   'Amarillo',
   'Naranja',
   'Otro'
+];
+
+export const genders = [
+  'Femenino',
+  'Masculino',
+  'Otro'
+];
+
+export const languages = [
+  'Español',
+  'Inglés',
+  'Portugués'
 ];
