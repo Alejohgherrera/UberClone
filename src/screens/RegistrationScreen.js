@@ -82,7 +82,7 @@ const getDaysUntil = (date) => {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
 
-export default function RegistrationScreen() {
+export default function RegistrationScreen({ onNavigateToHome }) {
   const [tab, setTab] = useState(1);
   const [personal, setPersonal] = useState(initialPersonal);
   const [vehicle, setVehicle] = useState(initialVehicle);
@@ -269,7 +269,8 @@ export default function RegistrationScreen() {
     } else {
       Alert.alert(
         '¡Registro completado!',
-        'Tu solicitud y documentos han sido enviados exitosamente para revisión. Te notificaremos pronto.'
+        'Tu solicitud y documentos han sido enviados exitosamente para revisión. Te notificaremos pronto.',
+        onNavigateToHome ? [{ text: 'Ir al Inicio', onPress: onNavigateToHome }] : undefined
       );
     }
   };
@@ -283,6 +284,14 @@ export default function RegistrationScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
+          {onNavigateToHome && (
+            <Pressable
+              style={{ marginBottom: 12, paddingVertical: 4, flexDirection: 'row', alignItems: 'center' }}
+              onPress={onNavigateToHome}
+            >
+              <Text style={{ fontSize: 15, color: colors.black, fontWeight: '700' }}>← Volver al mapa de Inicio</Text>
+            </Pressable>
+          )}
           <Text style={styles.brand}>
             Uber <Text style={styles.driver}>Conductor</Text>
           </Text>

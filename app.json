@@ -7,7 +7,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Esta aplicación requiere acceso a tu ubicación en tiempo real para mostrar tu posición en el mapa y asignarte viajes cercanos."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -15,8 +18,20 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Esta aplicación requiere acceso a tu ubicación para conectarte con pasajeros."
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }
