@@ -40,6 +40,9 @@ function friendlyError(error) {
     const key = Object.keys(DUPLICATE_MESSAGES).find((name) => error.message.includes(name));
     return new Error(DUPLICATE_MESSAGES[key] || 'Alguno de los datos ya está registrado.');
   }
+  if (error.code === 'email_address_invalid') {
+    return new Error('El correo no es válido, revísalo.');
+  }
   if (error.message?.includes('User already registered')) {
     return new Error('Ese correo ya tiene una cuenta.');
   }

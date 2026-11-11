@@ -1,4 +1,4 @@
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const TEXT_REGEX = /^[A-Za-zÁÉÍÓÚÜáéíóúüÑñ0-9 -]{2,30}$/;
 
 const MAX_AGE_BY_CATEGORY = {
@@ -81,7 +81,7 @@ export function validatePersonal(data, password) {
   if (!data.gender) errors.gender = 'Selecciona tu género.';
 
   if (!data.email) errors.email = 'Ingresa tu correo electrónico.';
-  else if (!EMAIL_REGEX.test(data.email)) errors.email = 'Ingresa un correo válido.';
+  else if (!EMAIL_REGEX.test(data.email)) errors.email = 'Correo no válido: sin tildes, ñ ni espacios.';
 
   if (password !== null) {
     if (!password) errors.password = 'Crea una contraseña.';
@@ -156,7 +156,7 @@ export function validateDocuments(data, requiresRevision, documentNumber) {
   }
 
   if (!data.mercadoPagoEmail) errors.mercadoPagoEmail = 'Ingresa el correo de Mercado Pago.';
-  else if (!EMAIL_REGEX.test(data.mercadoPagoEmail)) errors.mercadoPagoEmail = 'Ingresa un correo válido.';
+  else if (!EMAIL_REGEX.test(data.mercadoPagoEmail)) errors.mercadoPagoEmail = 'Correo no válido: sin tildes, ñ ni espacios.';
 
   if (!data.termsAccepted) errors.termsAccepted = 'Debes aceptar los términos y la comisión del 15%.';
 
