@@ -30,7 +30,8 @@
         {
           "locationWhenInUsePermission": "Esta aplicación requiere acceso a tu ubicación para conectarte con pasajeros."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

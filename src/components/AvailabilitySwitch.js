@@ -34,7 +34,7 @@ export default function AvailabilitySwitch({
       <View style={styles.metricsRow}>
         <View style={styles.metricItem}>
           <Text style={styles.metricLabel}>Ganancias de hoy</Text>
-          <Text style={styles.metricValue}>$0.00 COP</Text>
+          <Text style={styles.metricValue}>$0 COP</Text>
         </View>
         <View style={styles.metricDivider} />
         <View style={styles.metricItem}>
@@ -69,12 +69,7 @@ export default function AvailabilitySwitch({
             <ActivityIndicator color="#FFF" size="small" />
           ) : (
             <>
-              <View
-                style={[
-                  styles.btnIndicatorDot,
-                  isAvailable ? styles.btnDotOnline : styles.btnDotOffline,
-                ]}
-              />
+              <View style={styles.btnIndicatorDot} />
               <Text style={styles.actionBtnText}>
                 {isAvailable ? 'DESCONECTAR' : 'INICIAR'}
               </Text>
@@ -213,11 +208,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginRight: 8,
-  },
-  btnDotOffline: {
-    backgroundColor: '#FFF',
-  },
-  btnDotOnline: {
     backgroundColor: '#FFF',
   },
   actionBtnText: {

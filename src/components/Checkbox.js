@@ -3,7 +3,7 @@ import { colors } from '../theme/colors';
 
 export default function Checkbox({ label, checked, onChange, error }) {
   return (
-    <View style={[styles.wrap, error && styles.invalidWrap]}>
+    <View style={styles.wrap}>
       <Pressable style={styles.row} onPress={() => onChange(!checked)}>
         <View style={[styles.box, checked && styles.boxChecked]}>
           {checked ? <Text style={styles.check}>✓</Text> : null}
@@ -17,7 +17,6 @@ export default function Checkbox({ label, checked, onChange, error }) {
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 16 },
-  invalidWrap: { marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'flex-start' },
   box: {
     width: 22,
