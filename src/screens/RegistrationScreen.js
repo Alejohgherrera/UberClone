@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +18,17 @@ import DateField from '../components/DateField';
 import Checkbox from '../components/Checkbox';
 import { categories, colors as vehicleColors, genders, languages } from '../data/options';
 import { colors } from '../theme/colors';
+import { registerDriver } from '../services/registrationService';
+import {
+  daysUntil,
+  getVehicleAge,
+  validateDocuments,
+  validatePersonal,
+  validateVehicle,
+} from '../utils/validators';
+
+const TABS = ['1. Datos personales', '2. Vehículo', '3. Documentos y pagos'];
+const BUTTON_LABELS = ['Continuar con vehículo', 'Continuar con documentos', 'Finalizar registro'];
 
 const initialPersonal = {
   photo: '',
@@ -52,230 +64,100 @@ const initialDocuments = {
   termsAccepted: false,
 };
 
-const isAdult = (date) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
-  const birth = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(birth.getTime())) return false;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const month = today.getMonth() - birth.getMonth();
-  if (month < 0 || (month === 0 && today.getDate() < birth.getDate())) age -= 1;
-  return age >= 18;
-};
-
-const isFutureDate = (date) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
-  const d = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return d > today;
-};
-
-const getDaysUntil = (date) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const target = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(target.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diffTime = target.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
-
-export default function RegistrationScreen({ onNavigateToHome }) {
+export default function RegistrationScreen({ isLoggedIn, onRegistered, onBack }) {
   const [tab, setTab] = useState(1);
   const [personal, setPersonal] = useState(initialPersonal);
+  const [password, setPassword] = useState('');
   const [vehicle, setVehicle] = useState(initialVehicle);
   const [documents, setDocuments] = useState(initialDocuments);
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
   const scrollRef = useRef(null);
 
-  const update = (group, key, value) => {
-    const setter =
-      group === 'personal'
-        ? setPersonal
-        : group === 'vehicle'
-        ? setVehicle
-        : setDocuments;
-    setter((prev) => ({ ...prev, [key]: value }));
+  const vehicleAge = getVehicleAge(vehicle.year);
+  const requiresRevision = vehicleAge >= 6;
+
+  const updatePersonal = (key, value) => {
+    setPersonal((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
-  const personalErrors = useMemo(
-    () => ({
-      photo: !personal.photo ? 'La foto de perfil es obligatoria.' : '',
-      name: !personal.name
-        ? 'Ingresa tu nombre completo.'
-        : !/^[A-Za-zÁÉÍÓÚáéíóúÑñ ]{2,50}$/.test(personal.name)
-        ? 'Nombre: solo letras y espacios (máx. 50).'
-        : '',
-      document: !personal.document
-        ? 'Ingresa tu documento de identidad.'
-        : !/^\d{6,10}$/.test(personal.document)
-        ? 'Documento: debe tener entre 6 y 10 dígitos.'
-        : '',
-      phone: !personal.phone
-        ? 'Ingresa tu número de celular.'
-        : !/^\d{10}$/.test(personal.phone)
-        ? 'Celular: ingresa un número de 10 dígitos.'
-        : '',
-      birthDate: !personal.birthDate
-        ? 'Ingresa tu fecha de nacimiento.'
-        : !isAdult(personal.birthDate)
-        ? 'Debes ser mayor de 18 años (formato AAAA-MM-DD).'
-        : '',
-      gender: !personal.gender ? 'Selecciona tu género.' : '',
-      email: !personal.email
-        ? 'Ingresa tu correo electrónico.'
-        : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personal.email)
-        ? 'Ingresa un correo electrónico válido.'
-        : '',
-    }),
-    [personal]
-  );
+  const updateVehicle = (key, value) => {
+    setVehicle((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => ({ ...prev, [key]: undefined }));
+  };
 
-  const vehicleErrors = useMemo(
-    () => ({
-      category: !vehicle.category ? 'Selecciona una categoría de vehículo.' : '',
-      plate: !vehicle.plate
-        ? 'Ingresa la placa del vehículo.'
-        : !/^[A-Z]{3}\d{2,3}[A-Z]?$/.test(vehicle.plate)
-        ? 'Placa: formato no válido (ej. ABC123 o ABC12D).'
-        : '',
-      make: !vehicle.make
-        ? 'Ingresa la marca del vehículo.'
-        : vehicle.make.length > 30
-        ? 'Marca: máximo 30 caracteres.'
-        : '',
-      model: !vehicle.model
-        ? 'Ingresa el modelo del vehículo.'
-        : vehicle.model.length > 30
-        ? 'Modelo: máximo 30 caracteres.'
-        : '',
-      year: !vehicle.year
-        ? 'Ingresa el año del vehículo.'
-        : !/^(19|20)\d{2}$/.test(vehicle.year) ||
-          Number(vehicle.year) > new Date().getFullYear() + 1
-        ? 'Año: ingresa un año de 4 dígitos válido (ej. 2022).'
-        : '',
-      color: !vehicle.color ? 'Selecciona el color del vehículo.' : '',
-      capacity: !vehicle.capacity
-        ? 'Ingresa la capacidad de pasajeros.'
-        : !/^\d+$/.test(vehicle.capacity)
-        ? 'Capacidad: ingresa solo números.'
-        : vehicle.category === 'XL' && Number(vehicle.capacity) < 6
-        ? 'La categoría XL requiere al menos 6 pasajeros.'
-        : '',
-      photo: !vehicle.photo ? 'La foto del vehículo es obligatoria.' : '',
-    }),
-    [vehicle]
-  );
+  const updateDocuments = (key, value) => {
+    setDocuments((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => ({ ...prev, [key]: undefined }));
+  };
 
-  const vehicleYear = Number(vehicle.year);
-  const currentYear = new Date().getFullYear();
-  const vehicleAge = vehicleYear > 1900 ? currentYear - vehicleYear : 0;
-  // En Colombia, los vehículos particulares con 6 o más años de antigüedad requieren técnico-mecánica
-  const requiresRevision = vehicleAge >= 6;
+  const updatePassword = (value) => {
+    setPassword(value);
+    setErrors((prev) => ({ ...prev, password: undefined }));
+  };
 
-  const documentErrors = useMemo(
-    () => ({
-      licenseNumber: !documents.licenseNumber
-        ? 'Ingresa el número de tu licencia de conducción.'
-        : !/^\d{6,12}$/.test(documents.licenseNumber)
-        ? 'Licencia: debe tener entre 6 y 12 dígitos.'
-        : '',
-      licensePhoto: !documents.licensePhoto
-        ? 'La foto de la licencia de conducción es obligatoria.'
-        : '',
-      licenseExpiry: !documents.licenseExpiry
-        ? 'Ingresa la fecha de vencimiento de la licencia.'
-        : !isFutureDate(documents.licenseExpiry)
-        ? 'Licencia: la fecha de vencimiento debe ser posterior a hoy (AAAA-MM-DD).'
-        : '',
-      soatPhoto: !documents.soatPhoto ? 'La foto del SOAT es obligatoria.' : '',
-      soatExpiry: !documents.soatExpiry
-        ? 'Ingresa la fecha de vencimiento del SOAT.'
-        : !isFutureDate(documents.soatExpiry)
-        ? 'SOAT: la fecha de vencimiento debe ser posterior a hoy (AAAA-MM-DD).'
-        : '',
-      revisionPhoto:
-        requiresRevision && !documents.revisionPhoto
-          ? 'La foto del certificado de revisión técnico-mecánica es obligatoria.'
-          : '',
-      revisionExpiry:
-        requiresRevision && !documents.revisionExpiry
-          ? 'Ingresa la fecha de vencimiento de la técnico-mecánica.'
-          : requiresRevision && !isFutureDate(documents.revisionExpiry)
-          ? 'Técnico-mecánica: la fecha de vencimiento debe ser posterior a hoy (AAAA-MM-DD).'
-          : '',
-      mercadoPagoEmail: !documents.mercadoPagoEmail
-        ? 'Ingresa el correo de tu cuenta de Mercado Pago.'
-        : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(documents.mercadoPagoEmail)
-        ? 'Mercado Pago: ingresa un correo electrónico válido.'
-        : '',
-      termsAccepted: !documents.termsAccepted
-        ? 'Debes aceptar los términos y la comisión del servicio del 15%.'
-        : '',
-    }),
-    [documents, requiresRevision]
-  );
+  const getTabErrors = (tabNumber) => {
+    if (tabNumber === 1) return validatePersonal(personal, isLoggedIn ? null : password);
+    if (tabNumber === 2) return validateVehicle(vehicle);
+    return validateDocuments(documents, requiresRevision, personal.document);
+  };
 
-  const handleTabPress = (targetTab) => {
-    if (targetTab === tab) return;
-    if (targetTab > tab) {
-      const current =
-        tab === 1 ? personalErrors : tab === 2 ? vehicleErrors : documentErrors;
-      const activeErrors = Object.entries(current)
-        .map(([_, msg]) => msg)
-        .filter(Boolean);
-
-      if (activeErrors.length > 0) {
-        setErrors(current);
-        scrollRef.current?.scrollTo({ y: 0, animated: true });
-        Alert.alert(
-          'Faltan datos requeridos',
-          `Por favor completa la sección actual antes de avanzar:\n\n• ${activeErrors.join('\n• ')}`
-        );
-        return;
-      }
-    }
-    setTab(targetTab);
+  const goToTab = (tabNumber) => {
+    setTab(tabNumber);
+    setErrors({});
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 
-  const next = () => {
-    const current =
-      tab === 1 ? personalErrors : tab === 2 ? vehicleErrors : documentErrors;
-    const activeErrors = Object.entries(current)
-      .map(([_, msg]) => msg)
-      .filter(Boolean);
+  const showErrors = (tabErrors) => {
+    setErrors(tabErrors);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    Alert.alert('Faltan datos', `• ${Object.values(tabErrors).join('\n• ')}`);
+  };
 
-    if (activeErrors.length > 0) {
-      setErrors(current);
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-      Alert.alert(
-        'Faltan datos requeridos',
-        `Por favor revisa los siguientes campos:\n\n• ${activeErrors.join('\n• ')}`
-      );
+  const handleTabPress = (target) => {
+    if (target <= tab) {
+      goToTab(target);
       return;
     }
 
-    if (tab === 1) {
-      setTab(2);
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    } else if (tab === 2) {
-      setTab(3);
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    } else {
+    for (let i = tab; i < target; i++) {
+      const tabErrors = getTabErrors(i);
+      if (Object.keys(tabErrors).length > 0) {
+        if (i !== tab) goToTab(i);
+        showErrors(tabErrors);
+        return;
+      }
+    }
+    goToTab(target);
+  };
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      await registerDriver({ personal, password, vehicle, documents, requiresRevision });
       Alert.alert(
-        '¡Registro completado!',
-        'Tu solicitud y documentos han sido enviados exitosamente para revisión. Te notificaremos pronto.',
-        onNavigateToHome ? [{ text: 'Ir al Inicio', onPress: onNavigateToHome }] : undefined
+        '¡Registro enviado!',
+        'Tus documentos quedaron en revisión. Te avisaremos cuando tu cuenta sea aprobada.',
+        [{ text: 'Ir al inicio', onPress: onRegistered }]
       );
+    } catch (error) {
+      Alert.alert('No se pudo registrar', error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const err = (key) => errors[key];
+  const next = () => {
+    const tabErrors = getTabErrors(tab);
+    if (Object.keys(tabErrors).length > 0) {
+      showErrors(tabErrors);
+      return;
+    }
+
+    if (tab < 3) goToTab(tab + 1);
+    else save();
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -284,42 +166,35 @@ export default function RegistrationScreen({ onNavigateToHome }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
-          {onNavigateToHome && (
-            <Pressable
-              style={{ marginBottom: 12, paddingVertical: 4, flexDirection: 'row', alignItems: 'center' }}
-              onPress={onNavigateToHome}
-            >
-              <Text style={{ fontSize: 15, color: colors.black, fontWeight: '700' }}>← Volver al mapa de Inicio</Text>
+          {onBack && (
+            <Pressable style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backText}>← Volver al mapa</Text>
             </Pressable>
           )}
           <Text style={styles.brand}>
             Uber <Text style={styles.driver}>Conductor</Text>
           </Text>
           <Text style={styles.title}>Crea tu cuenta</Text>
-          <Text style={styles.subtitle}>
-            Completa tus datos para comenzar a conducir
-          </Text>
+          <Text style={styles.subtitle}>Completa tus datos para comenzar a conducir</Text>
         </View>
+
         <View style={styles.tabs}>
-          <Pressable
-            style={[styles.tab, tab === 1 && styles.activeTab]}
-            onPress={() => handleTabPress(1)}
-          >
-            <Text style={[styles.tabText, tab === 1 && styles.activeText]}>1. Datos personales</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.tab, tab === 2 && styles.activeTab]}
-            onPress={() => handleTabPress(2)}
-          >
-            <Text style={[styles.tabText, tab === 2 && styles.activeText]}>2. Vehículo</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.tab, tab === 3 && styles.activeTab]}
-            onPress={() => handleTabPress(3)}
-          >
-            <Text style={[styles.tabText, tab === 3 && styles.activeText]}>3. Documentos y pagos</Text>
-          </Pressable>
+          {TABS.map((label, index) => {
+            const tabNumber = index + 1;
+            const active = tab === tabNumber;
+            return (
+              <Pressable
+                key={label}
+                style={[styles.tab, active && styles.activeTab]}
+                onPress={() => handleTabPress(tabNumber)}
+                disabled={saving}
+              >
+                <Text style={[styles.tabText, active && styles.activeText]}>{label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
+
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.content}
@@ -328,37 +203,38 @@ export default function RegistrationScreen({ onNavigateToHome }) {
           {tab === 1 && (
             <PersonalForm
               data={personal}
-              update={(key, value) => update('personal', key, value)}
-              error={err}
+              update={updatePersonal}
+              password={password}
+              onPasswordChange={updatePassword}
+              showPassword={!isLoggedIn}
+              errors={errors}
             />
           )}
-          {tab === 2 && (
-            <VehicleForm
-              data={vehicle}
-              update={(key, value) => update('vehicle', key, value)}
-              error={err}
-            />
-          )}
+          {tab === 2 && <VehicleForm data={vehicle} update={updateVehicle} errors={errors} />}
           {tab === 3 && (
             <DocumentsForm
               data={documents}
-              vehicle={vehicle}
+              vehicleYear={vehicle.year}
               vehicleAge={vehicleAge}
               requiresRevision={requiresRevision}
-              update={(key, value) => update('documents', key, value)}
-              error={err}
+              update={updateDocuments}
+              errors={errors}
             />
           )}
 
-          <Pressable style={styles.button} onPress={next}>
-            <Text style={styles.buttonText}>
-              {tab === 1
-                ? 'Continuar con vehículo'
-                : tab === 2
-                ? 'Continuar con documentos'
-                : 'Finalizar registro'}
-            </Text>
-            <Text style={styles.arrow}>{tab === 3 ? '✓' : '→'}</Text>
+          <Pressable
+            style={[styles.button, saving && styles.buttonDisabled]}
+            onPress={next}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <>
+                <Text style={styles.buttonText}>{BUTTON_LABELS[tab - 1]}</Text>
+                <Text style={styles.arrow}>{tab === 3 ? '✓' : '→'}</Text>
+              </>
+            )}
           </Pressable>
 
           {tab === 2 && (
@@ -377,21 +253,21 @@ export default function RegistrationScreen({ onNavigateToHome }) {
   );
 }
 
-function PersonalForm({ data, update, error }) {
+function PersonalForm({ data, update, password, onPasswordChange, showPassword, errors }) {
   return (
     <>
       <PhotoPicker
         label="Foto de perfil"
         value={data.photo}
         onChange={(v) => update('photo', v)}
-        error={error('photo')}
+        error={errors.photo}
       />
       <TextField
         label="Nombre completo"
         placeholder="Ej. María González"
         value={data.name}
         onChangeText={(v) => update('name', v)}
-        error={error('name')}
+        error={errors.name}
         autoCapitalize="words"
       />
       <TextField
@@ -399,23 +275,24 @@ function PersonalForm({ data, update, error }) {
         placeholder="Solo números"
         value={data.document}
         onChangeText={(v) => update('document', v.replace(/\D/g, ''))}
-        error={error('document')}
+        error={errors.document}
         keyboardType="number-pad"
+        maxLength={10}
       />
       <TextField
         label="Número de celular"
-        placeholder="10 dígitos"
+        placeholder="3001234567"
         value={data.phone}
         onChangeText={(v) => update('phone', v.replace(/\D/g, ''))}
-        error={error('phone')}
+        error={errors.phone}
         keyboardType="phone-pad"
+        maxLength={10}
       />
       <DateField
         label="Fecha de nacimiento"
-        placeholder="AAAA-MM-DD"
         value={data.birthDate}
         onChange={(v) => update('birthDate', v)}
-        error={error('birthDate')}
+        error={errors.birthDate}
       />
       <SelectField
         label="Género"
@@ -423,17 +300,28 @@ function PersonalForm({ data, update, error }) {
         options={genders}
         placeholder="Selecciona una opción"
         onChange={(v) => update('gender', v)}
-        error={error('gender')}
+        error={errors.gender}
       />
       <TextField
         label="Correo electrónico"
         placeholder="nombre@correo.com"
         value={data.email}
-        onChangeText={(v) => update('email', v)}
-        error={error('email')}
+        onChangeText={(v) => update('email', v.trim())}
+        error={errors.email}
         keyboardType="email-address"
         autoCapitalize="none"
       />
+      {showPassword && (
+        <TextField
+          label="Contraseña"
+          placeholder="Mínimo 8 caracteres"
+          value={password}
+          onChangeText={onPasswordChange}
+          error={errors.password}
+          secureTextEntry
+          autoCapitalize="none"
+        />
+      )}
       <SelectField
         label="Idioma"
         value={data.language}
@@ -445,7 +333,7 @@ function PersonalForm({ data, update, error }) {
   );
 }
 
-function VehicleForm({ data, update, error }) {
+function VehicleForm({ data, update, errors }) {
   return (
     <>
       <View style={styles.tip}>
@@ -460,37 +348,41 @@ function VehicleForm({ data, update, error }) {
         options={categories}
         placeholder="Selecciona una categoría"
         onChange={(v) => update('category', v)}
-        error={error('category')}
+        error={errors.category}
       />
       <TextField
         label="Placa"
         placeholder="ABC123"
         value={data.plate}
         onChangeText={(v) => update('plate', v.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-        error={error('plate')}
+        error={errors.plate}
         autoCapitalize="characters"
+        maxLength={6}
       />
       <TextField
         label="Marca"
         placeholder="Ej. Toyota"
         value={data.make}
         onChangeText={(v) => update('make', v)}
-        error={error('make')}
+        error={errors.make}
+        maxLength={30}
       />
       <TextField
         label="Modelo"
         placeholder="Ej. Corolla"
         value={data.model}
         onChangeText={(v) => update('model', v)}
-        error={error('model')}
+        error={errors.model}
+        maxLength={30}
       />
       <TextField
         label="Año"
-        placeholder="Ej. 2024"
+        placeholder="Ej. 2022"
         value={data.year}
         onChangeText={(v) => update('year', v.replace(/\D/g, ''))}
-        error={error('year')}
+        error={errors.year}
         keyboardType="number-pad"
+        maxLength={4}
       />
       <SelectField
         label="Color"
@@ -498,99 +390,92 @@ function VehicleForm({ data, update, error }) {
         options={vehicleColors}
         placeholder="Selecciona un color"
         onChange={(v) => update('color', v)}
-        error={error('color')}
+        error={errors.color}
       />
       <TextField
         label="Capacidad de pasajeros"
-        placeholder={data.category === 'XL' ? 'Mínimo 6' : 'Ej. 4'}
+        placeholder={data.category === 'XL' ? 'Entre 6 y 8' : '3 o 4'}
         value={data.capacity}
         onChangeText={(v) => update('capacity', v.replace(/\D/g, ''))}
-        error={error('capacity')}
+        error={errors.capacity}
         keyboardType="number-pad"
+        maxLength={1}
       />
       <PhotoPicker
         vehicle
         label="Foto del vehículo"
         value={data.photo}
         onChange={(v) => update('photo', v)}
-        error={error('photo')}
+        error={errors.photo}
       />
     </>
   );
 }
 
-function DocumentsForm({ data, vehicle, vehicleAge, requiresRevision, update, error }) {
-  const soatDays = getDaysUntil(data.soatExpiry);
-  const licenseDays = getDaysUntil(data.licenseExpiry);
-  const revisionDays = requiresRevision ? getDaysUntil(data.revisionExpiry) : null;
+function ExpiryWarning({ title, date }) {
+  const days = daysUntil(date);
+  if (days === null || days <= 0 || days > 30) return null;
 
+  return (
+    <View style={styles.warningBox}>
+      <Text style={styles.warningTitle}>⚠️ {title} próximo a vencer</Text>
+      <Text style={styles.warningText}>
+        {days === 1 ? 'Vence mañana.' : `Vence en ${days} días.`} Puedes registrarte, pero
+        recuerda renovarlo a tiempo para no quedar suspendido.
+      </Text>
+    </View>
+  );
+}
+
+function DocumentsForm({ data, vehicleYear, vehicleAge, requiresRevision, update, errors }) {
   return (
     <>
       <View style={styles.tip}>
         <Text style={styles.tipTitle}>Documentos requeridos</Text>
         <Text style={styles.tipText}>
-          Asegúrate de que las fotos sean nítidas y que las fechas coincidan con los documentos físicos.
+          Asegúrate de que las fotos sean nítidas y que las fechas coincidan con los documentos.
         </Text>
       </View>
 
       <Text style={styles.sectionHeader}>Licencia de conducción</Text>
       <TextField
-        label="Número de licencia de conducción"
+        label="Número de licencia"
         placeholder="Ej. 1020304050"
         value={data.licenseNumber}
         onChangeText={(v) => update('licenseNumber', v.replace(/\D/g, ''))}
-        error={error('licenseNumber')}
+        error={errors.licenseNumber}
         keyboardType="number-pad"
+        maxLength={12}
       />
       <DateField
-        label="Fecha de vencimiento de la licencia"
-        placeholder="AAAA-MM-DD"
+        label="Fecha de vencimiento"
         value={data.licenseExpiry}
         onChange={(v) => update('licenseExpiry', v)}
-        error={error('licenseExpiry')}
+        error={errors.licenseExpiry}
       />
-      {licenseDays !== null && licenseDays > 0 && licenseDays <= 30 && (
-        <View style={styles.warningBox}>
-          <Text style={styles.warningTitle}>⚠️ Licencia próxima a vencer</Text>
-          <Text style={styles.warningText}>
-            {licenseDays === 1
-              ? 'Tu licencia vence mañana (en 1 día). Podrás registrarte, pero recuerda renovarla oportunamente para mantener tu cuenta activa.'
-              : `Tu licencia vence en ${licenseDays} días. Recuerda renovarla a tiempo.`}
-          </Text>
-        </View>
-      )}
+      <ExpiryWarning title="Licencia" date={data.licenseExpiry} />
       <PhotoPicker
         document
-        label="Foto de la licencia de conducción"
+        label="Foto de la licencia"
         value={data.licensePhoto}
         onChange={(v) => update('licensePhoto', v)}
-        error={error('licensePhoto')}
+        error={errors.licensePhoto}
       />
 
       <Text style={styles.sectionHeader}>SOAT</Text>
       <DateField
-        label="Fecha de vencimiento del SOAT"
-        placeholder="AAAA-MM-DD"
+        label="Fecha de vencimiento"
         value={data.soatExpiry}
         onChange={(v) => update('soatExpiry', v)}
-        error={error('soatExpiry')}
+        error={errors.soatExpiry}
       />
-      {soatDays !== null && soatDays > 0 && soatDays <= 30 && (
-        <View style={styles.warningBox}>
-          <Text style={styles.warningTitle}>⚠️ Atención: SOAT próximo a vencer</Text>
-          <Text style={styles.warningText}>
-            {soatDays === 1
-              ? 'Tu SOAT vence mañana (en 1 día). Podrás completar tu registro, pero deberás renovarlo y actualizarlo en las próximas 24 horas para no ser suspendido de la plataforma.'
-              : `Tu SOAT vence en ${soatDays} días. Podrás registrarte, pero recuerda renovarlo a tiempo para evitar la interrupción de tus viajes.`}
-          </Text>
-        </View>
-      )}
+      <ExpiryWarning title="SOAT" date={data.soatExpiry} />
       <PhotoPicker
         document
         label="Foto del SOAT vigente"
         value={data.soatPhoto}
         onChange={(v) => update('soatPhoto', v)}
-        error={error('soatPhoto')}
+        error={errors.soatPhoto}
       />
 
       <Text style={styles.sectionHeader}>Revisión técnico-mecánica</Text>
@@ -599,66 +484,57 @@ function DocumentsForm({ data, vehicle, vehicleAge, requiresRevision, update, er
           <View style={styles.alertBox}>
             <Text style={styles.alertTitle}>Obligatoria para tu vehículo</Text>
             <Text style={styles.alertText}>
-              Vehículo año {vehicle.year || 'antiguo'} ({vehicleAge} años de antigüedad): requiere revisión técnico-mecánica vigente según la regulación de tránsito.
+              Modelo {vehicleYear} ({vehicleAge} años): requiere técnico-mecánica vigente.
             </Text>
           </View>
           <DateField
-            label="Fecha de vencimiento técnico-mecánica"
-            placeholder="AAAA-MM-DD"
+            label="Fecha de vencimiento"
             value={data.revisionExpiry}
             onChange={(v) => update('revisionExpiry', v)}
-            error={error('revisionExpiry')}
+            error={errors.revisionExpiry}
           />
-          {revisionDays !== null && revisionDays > 0 && revisionDays <= 30 && (
-            <View style={styles.warningBox}>
-              <Text style={styles.warningTitle}>⚠️ Técnico-mecánica próxima a vencer</Text>
-              <Text style={styles.warningText}>
-                {revisionDays === 1
-                  ? 'Tu revisión técnico-mecánica vence mañana (en 1 día). Recuerda renovarla antes de su expiración.'
-                  : `Tu revisión técnico-mecánica vence en ${revisionDays} días. Recuerda renovarla a tiempo.`}
-              </Text>
-            </View>
-          )}
+          <ExpiryWarning title="Técnico-mecánica" date={data.revisionExpiry} />
           <PhotoPicker
             document
-            label="Foto del certificado de técnico-mecánica"
+            label="Foto del certificado"
             value={data.revisionPhoto}
             onChange={(v) => update('revisionPhoto', v)}
-            error={error('revisionPhoto')}
+            error={errors.revisionPhoto}
           />
         </>
       ) : (
         <View style={styles.exemptBox}>
-          <Text style={styles.exemptTitle}>Vehículo exento de revisión técnico-mecánica</Text>
+          <Text style={styles.exemptTitle}>Vehículo exento</Text>
           <Text style={styles.exemptText}>
-            Tu vehículo modelo {vehicle.year || 'reciente'} ({vehicleAge} años de antigüedad) está exento de revisión técnico-mecánica por contar con menos de 6 años de antigüedad.
+            Tu vehículo modelo {vehicleYear} tiene menos de 6 años, no necesita técnico-mecánica.
           </Text>
         </View>
       )}
 
       <Text style={styles.sectionHeader}>Método de pago (Mercado Pago)</Text>
       <View style={styles.secureBox}>
-        <Text style={styles.secureTitle}>Pagos 100% seguros</Text>
+        <Text style={styles.secureTitle}>Pagos seguros</Text>
         <Text style={styles.secureText}>
-          Tus ganancias serán enviadas directamente a tu cuenta de Mercado Pago. Por tu seguridad, no guardamos números de cuenta bancaria ni de tarjeta en la aplicación.
+          Tus ganancias llegan a tu cuenta de Mercado Pago. No guardamos datos bancarios ni de
+          tarjetas.
         </Text>
       </View>
       <TextField
-        label="Correo de la cuenta de Mercado Pago"
+        label="Correo de Mercado Pago"
         placeholder="conductor@correo.com"
         value={data.mercadoPagoEmail}
         onChangeText={(v) => update('mercadoPagoEmail', v.trim())}
-        error={error('mercadoPagoEmail')}
+        error={errors.mercadoPagoEmail}
         keyboardType="email-address"
         autoCapitalize="none"
       />
 
-      <Text style={styles.sectionHeader}>Aceptación de términos y condiciones</Text>
+      <Text style={styles.sectionHeader}>Términos y condiciones</Text>
       <Checkbox
-        label="Acepto los términos y condiciones de la plataforma. Tengo conocimiento y acepto la comisión del 15% aplicable sobre el valor de cada viaje realizado."
+        label="Acepto los términos y condiciones de la plataforma y la comisión del 15% sobre cada viaje realizado."
         checked={data.termsAccepted}
         onChange={(v) => update('termsAccepted', v)}
-        error={error('termsAccepted')}
+        error={errors.termsAccepted}
       />
     </>
   );
@@ -668,6 +544,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.surface },
   flex: { flex: 1 },
   header: { paddingHorizontal: 24, paddingTop: 18, paddingBottom: 20 },
+  backButton: { marginBottom: 12, paddingVertical: 4 },
+  backText: { fontSize: 15, color: colors.black, fontWeight: '700' },
   brand: { fontSize: 21, fontWeight: '800', color: colors.black },
   driver: { color: colors.green },
   title: { fontSize: 28, fontWeight: '800', marginTop: 25, color: colors.black },
@@ -686,13 +564,9 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   activeTab: { borderBottomColor: colors.green },
-  tabText: { fontSize: 13, color: colors.muted, fontWeight: '600' },
+  tabText: { fontSize: 13, color: colors.muted, fontWeight: '600', textAlign: 'center' },
   activeText: { color: colors.black },
-  content: {
-    backgroundColor: colors.background,
-    padding: 20,
-    paddingBottom: 42,
-  },
+  content: { backgroundColor: colors.background, padding: 20, paddingBottom: 42 },
   sectionHeader: {
     fontSize: 16,
     fontWeight: '700',
@@ -709,6 +583,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 12,
   },
+  buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
   arrow: { color: '#FFF', fontSize: 20, marginLeft: 10 },
   notice: {
@@ -718,12 +593,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingHorizontal: 15,
   },
-  tip: {
-    backgroundColor: '#EAF9F0',
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 18,
-  },
+  tip: { backgroundColor: colors.lightGreen, padding: 14, borderRadius: 10, marginBottom: 18 },
   tipTitle: { fontWeight: '700', marginBottom: 3 },
   tipText: { color: colors.muted, fontSize: 13 },
   alertBox: {
@@ -734,36 +604,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
   },
-  alertTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#B42318',
-    marginBottom: 3,
-  },
-  alertText: {
-    fontSize: 12,
-    color: '#7A271A',
-    lineHeight: 17,
-  },
+  alertTitle: { fontSize: 13, fontWeight: '700', color: '#B42318', marginBottom: 3 },
+  alertText: { fontSize: 12, color: '#7A271A', lineHeight: 17 },
   exemptBox: {
-    backgroundColor: '#EAF9F0',
+    backgroundColor: colors.lightGreen,
     borderLeftWidth: 4,
     borderLeftColor: colors.green,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
-  exemptTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#027A48',
-    marginBottom: 3,
-  },
-  exemptText: {
-    fontSize: 12,
-    color: '#05603A',
-    lineHeight: 17,
-  },
+  exemptTitle: { fontSize: 13, fontWeight: '700', color: '#027A48', marginBottom: 3 },
+  exemptText: { fontSize: 12, color: '#05603A', lineHeight: 17 },
   secureBox: {
     backgroundColor: '#F0F9FF',
     borderLeftWidth: 4,
@@ -772,35 +624,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
   },
-  secureTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#026AA2',
-    marginBottom: 3,
-  },
-  secureText: {
-    fontSize: 12,
-    color: '#0E7090',
-    lineHeight: 17,
-  },
+  secureTitle: { fontSize: 13, fontWeight: '700', color: '#026AA2', marginBottom: 3 },
+  secureText: { fontSize: 12, color: '#0E7090', lineHeight: 17 },
   warningBox: {
-    backgroundColor: '#FEF0C7',
+    backgroundColor: colors.warningBg,
     borderLeftWidth: 4,
-    borderLeftColor: '#F79009',
+    borderLeftColor: colors.warning,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
     marginTop: -4,
   },
-  warningTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#B54708',
-    marginBottom: 3,
-  },
-  warningText: {
-    fontSize: 12,
-    color: '#93370D',
-    lineHeight: 17,
-  },
+  warningTitle: { fontSize: 13, fontWeight: '700', color: '#B54708', marginBottom: 3 },
+  warningText: { fontSize: 12, color: '#93370D', lineHeight: 17 },
 });

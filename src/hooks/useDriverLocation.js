@@ -172,18 +172,9 @@ export default function useDriverLocation() {
    * y limpia cualquier suscripción activa al desmontarse para prevenir fugas de memoria.
    */
   useEffect(() => {
-    let isMounted = true;
-
-    const init = async () => {
-      if (isMounted) {
-        await requestPermissions();
-      }
-    };
-
-    init();
+    requestPermissions();
 
     return () => {
-      isMounted = false;
       if (locationSubscriptionRef.current) {
         locationSubscriptionRef.current.remove();
         locationSubscriptionRef.current = null;

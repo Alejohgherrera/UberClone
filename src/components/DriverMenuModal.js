@@ -34,7 +34,7 @@ export default function DriverMenuModal({
                 {driverProfile?.vehicle || 'Vehículo registrado'}
               </Text>
               <View style={styles.ratingBadge}>
-                <Text style={styles.ratingText}>★ 4.96 • UberX</Text>
+                <Text style={styles.ratingText}>{driverProfile?.category || 'Sin categoría'}</Text>
               </View>
             </View>
             <Pressable style={styles.closeBtn} onPress={onClose}>
@@ -118,7 +118,7 @@ export default function DriverMenuModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   sheet: {
