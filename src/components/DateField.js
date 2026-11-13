@@ -14,9 +14,9 @@ export default function DateField({ label, value, onChange, error, minimumDate, 
   const [visible, setVisible] = useState(false);
   const selected = parseDate(value) || maximumDate || minimumDate || new Date();
 
-  const handleChange = (event, date) => {
+  const handleValueChange = (event, date) => {
     if (Platform.OS === 'android') setVisible(false);
-    if (event.type === 'set' && date) onChange(formatDate(date));
+    if (date) onChange(formatDate(date));
   };
 
   const picker = (
@@ -26,7 +26,8 @@ export default function DateField({ label, value, onChange, error, minimumDate, 
       display={Platform.OS === 'ios' ? 'spinner' : 'default'}
       minimumDate={minimumDate}
       maximumDate={maximumDate}
-      onChange={handleChange}
+      onValueChange={handleValueChange}
+      onDismiss={() => setVisible(false)}
       locale="es-CO"
       themeVariant="light"
       textColor={colors.black}
