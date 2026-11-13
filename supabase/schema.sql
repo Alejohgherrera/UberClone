@@ -18,7 +18,7 @@ create table public.drivers (
 
 create table public.vehicles (
   driver_id uuid primary key references public.drivers (id) on delete cascade,
-  category text not null check (category in ('Económico', 'Comfort', 'XL', 'Premium')),
+  category text not null check (category in ('Económico', 'XL', 'Premium')),
   plate text not null unique,
   make text not null,
   model text not null,

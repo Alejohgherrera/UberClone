@@ -31,7 +31,15 @@
           "locationWhenInUsePermission": "Esta aplicación requiere acceso a tu ubicación para conectarte con pasajeros."
         }
       ],
-      "expo-sqlite"
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "La aplicación usa la cámara para tomar tu foto de perfil, la del vehículo y tus documentos.",
+          "photosPermission": "La aplicación accede a tus fotos para cargar tu foto de perfil, la del vehículo y tus documentos."
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-web-browser"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

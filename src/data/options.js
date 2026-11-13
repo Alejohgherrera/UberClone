@@ -1,6 +1,5 @@
 export const categories = [
   'Económico',
-  'Comfort',
   'XL',
   'Premium'
 ];
@@ -26,6 +25,5 @@ export const genders = [
 
 export const languages = [
   'Español',
-  'Inglés',
-  'Portugués'
+  'Inglés'
 ];
