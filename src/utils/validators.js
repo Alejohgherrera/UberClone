@@ -1,12 +1,9 @@
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const TEXT_REGEX = /^[A-Za-zÁÉÍÓÚÜáéíóúüÑñ0-9 -]{2,30}$/;
 
-const MAX_AGE_BY_CATEGORY = {
-  Económico: 15,
-  Comfort: 10,
-  XL: 10,
-  Premium: 6,
-};
+export function hasErrors(errors) {
+  return Object.keys(errors).length > 0;
+}
 
 export function parseDate(text) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
@@ -98,7 +95,6 @@ export function validateVehicle(data) {
   const errors = {};
   const capacity = Number(data.capacity);
   const year = Number(data.year);
-  const maxAge = MAX_AGE_BY_CATEGORY[data.category];
 
   if (!data.category) errors.category = 'Selecciona una categoría.';
 
@@ -112,32 +108,24 @@ export function validateVehicle(data) {
   else if (!TEXT_REGEX.test(data.model.trim())) errors.model = 'Modelo: solo letras y números.';
 
   if (!data.year) errors.year = 'Ingresa el año.';
-  else if (year < 1990 || year > new Date().getFullYear() + 1) errors.year = 'Año no válido.';
-  else if (maxAge && getVehicleAge(year) > maxAge) {
-    errors.year = `Para ${data.category} el vehículo debe tener máximo ${maxAge} años.`;
-  }
+  else if (year < 1990 || year > new Date().getFullYear()) errors.year = 'El año no puede ser mayor al actual.';
 
   if (!data.color) errors.color = 'Selecciona el color.';
 
   if (!data.capacity) errors.capacity = 'Ingresa la capacidad.';
-  else if (data.category === 'XL' && (capacity < 6 || capacity > 8)) {
-    errors.capacity = 'XL requiere entre 6 y 8 pasajeros.';
-  } else if (data.category !== 'XL' && (capacity < 3 || capacity > 4)) {
-    errors.capacity = 'La capacidad debe ser de 3 o 4 pasajeros.';
-  }
+  else if (capacity < 1 || capacity > 8) errors.capacity = 'La capacidad debe estar entre 1 y 8.';
+  else if (data.category === 'XL' && capacity < 6) errors.capacity = 'XL exige mínimo 6 pasajeros.';
 
   if (!data.photo) errors.photo = 'La foto del vehículo es obligatoria.';
 
   return errors;
 }
 
-export function validateDocuments(data, requiresRevision, documentNumber) {
+export function validateDocuments(data, requiresRevision) {
   const errors = {};
 
   if (!data.licenseNumber) errors.licenseNumber = 'Ingresa el número de licencia.';
-  else if (data.licenseNumber !== documentNumber) {
-    errors.licenseNumber = 'En Colombia el número de la licencia es tu número de cédula.';
-  }
+  else if (!/^\d{6,12}$/.test(data.licenseNumber)) errors.licenseNumber = 'Licencia: entre 6 y 12 dígitos.';
 
   if (!data.licensePhoto) errors.licensePhoto = 'La foto de la licencia es obligatoria.';
 
@@ -158,7 +146,7 @@ export function validateDocuments(data, requiresRevision, documentNumber) {
   if (!data.mercadoPagoEmail) errors.mercadoPagoEmail = 'Ingresa el correo de Mercado Pago.';
   else if (!EMAIL_REGEX.test(data.mercadoPagoEmail)) errors.mercadoPagoEmail = 'Correo no válido: sin tildes, ñ ni espacios.';
 
-  if (!data.termsAccepted) errors.termsAccepted = 'Debes aceptar los términos y la comisión del 15%.';
+  if (!data.termsAccepted) errors.termsAccepted = 'Debes aceptar los términos y la comisión.';
 
   return errors;
 }

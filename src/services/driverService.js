@@ -7,7 +7,7 @@ export async function getCurrentDriver() {
 
   const { data, error } = await supabase
     .from('drivers')
-    .select('id, full_name, email, approval_status, vehicles(make, model, plate, category)')
+    .select('id, full_name, email, phone, language, approval_status, vehicles(make, model, plate, category)')
     .eq('id', userId)
     .maybeSingle();
 
@@ -19,6 +19,8 @@ export async function getCurrentDriver() {
     id: data.id,
     name: data.full_name,
     email: data.email,
+    phone: data.phone,
+    language: data.language,
     approvalStatus: data.approval_status,
     category: vehicle?.category ?? '',
     vehicle: vehicle ? `${vehicle.make} ${vehicle.model} • ${vehicle.plate}` : '',
@@ -45,36 +47,4 @@ export async function updateDriverLocation(driverId, coords) {
   });
 
   if (error) console.warn('No se pudo enviar la ubicación:', error.message);
-}
-
-export function subscribeToRideRequests(driverId, onNewRequest) {
-  const channel = supabase
-    .channel(`ride-requests-${driverId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'ride_requests',
-        filter: `driver_id=eq.${driverId}`,
-      },
-      ({ new: row }) => {
-        if (row.status !== 'pending') return;
-        onNewRequest({
-          id: row.id,
-          passengerName: row.passenger_name,
-          pickupAddress: row.pickup_address,
-          dropoffAddress: row.dropoff_address,
-          fare: row.fare ? `$${Number(row.fare).toLocaleString('es-CO')} COP` : null,
-        });
-      }
-    )
-    .subscribe();
-
-  return () => supabase.removeChannel(channel);
-}
-
-export async function updateRideStatus(requestId, status) {
-  const { error } = await supabase.from('ride_requests').update({ status }).eq('id', requestId);
-  if (error) throw error;
 }

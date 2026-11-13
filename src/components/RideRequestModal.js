@@ -1,89 +1,63 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { calculateFare } from '../config/pricing';
+import { CATEGORY_LABELS, PAYMENT_LABELS, formatCOP } from '../utils/format';
 import { colors } from '../theme/colors';
 
-export default function RideRequestModal({
-  visible,
-  request,
-  onAccept,
-  onDecline,
-}) {
-  if (!request) return null;
+export default function RideRequestModal({ trip, secondsLeft, totalSeconds, onAccept, onReject }) {
+  if (!trip) return null;
+
+  const estimate = calculateFare(trip);
+  const progress = `${(secondsLeft / totalSeconds) * 100}%`;
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={onDecline}
-    >
+    <Modal visible transparent animationType="slide" onRequestClose={onReject}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          {/* Encabezado con tarifa y tiempo de recogida */}
+          <View style={styles.timerTrack}>
+            <View style={[styles.timerBar, { width: progress }]} />
+          </View>
+          <Text style={styles.timerText}>Tienes {secondsLeft} s para responder</Text>
+
           <View style={styles.topRow}>
             <View>
-              <Text style={styles.categoryBadge}>UberX • Aceptación inmediata</Text>
-              <Text style={styles.fare}>
-                {request.fare || '$14.200 COP'}
+              <Text style={styles.category}>
+                {CATEGORY_LABELS[trip.category]} • {PAYMENT_LABELS[trip.paymentMethod]}
               </Text>
+              <Text style={styles.fare}>{formatCOP(estimate.fare)}</Text>
+              <Text style={styles.earnings}>Ganas {formatCOP(estimate.driverEarnings)}</Text>
             </View>
             <View style={styles.etaBadge}>
-              <Text style={styles.etaText}>
-                {request.eta || '4 min'}
-              </Text>
-              <Text style={styles.etaSub}>a {request.distance || '1.1 km'}</Text>
+              <Text style={styles.etaText}>{Math.round(trip.durationMin)} min</Text>
+              <Text style={styles.etaSub}>{trip.distanceKm} km</Text>
             </View>
           </View>
 
-          {/* Datos del pasajero */}
-          <View style={styles.passengerRow}>
-            <View style={styles.passengerAvatar}>
-              <Text style={styles.avatarLetter}>
-                {request.passengerName ? request.passengerName.charAt(0) : 'P'}
-              </Text>
-            </View>
-            <View style={styles.passengerInfo}>
-              <Text style={styles.passengerName}>
-                {request.passengerName || 'Pasajero Uber'}
-              </Text>
-              <Text style={styles.passengerRating}>
-                ★ {request.rating || '4.95'} • Pago en efectivo o tarjeta
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.passenger}>{trip.passengerName || 'Pasajero'}</Text>
 
-          {/* Dirección de recogida y destino */}
           <View style={styles.routeBox}>
             <View style={styles.routeItem}>
-              <View style={[styles.routeDot, { backgroundColor: colors.green }]} />
+              <View style={[styles.dot, { backgroundColor: colors.green }]} />
               <View style={styles.routeTextWrap}>
-                <Text style={styles.routeLabel}>Punto de recogida</Text>
-                <Text style={styles.routeAddress} numberOfLines={1}>
-                  {request.pickupAddress || 'Calle 72 # 10-34, Chapinero'}
-                </Text>
+                <Text style={styles.routeLabel}>Recogida</Text>
+                <Text style={styles.address} numberOfLines={1}>{trip.origin?.address}</Text>
               </View>
             </View>
-
             <View style={styles.routeLine} />
-
             <View style={styles.routeItem}>
-              <View style={[styles.routeDot, { backgroundColor: colors.black }]} />
+              <View style={[styles.dot, { backgroundColor: colors.black }]} />
               <View style={styles.routeTextWrap}>
                 <Text style={styles.routeLabel}>Destino</Text>
-                <Text style={styles.routeAddress} numberOfLines={1}>
-                  {request.dropoffAddress || 'Centro Comercial Andino, Bogotá'}
-                </Text>
+                <Text style={styles.address} numberOfLines={1}>{trip.destination?.address}</Text>
               </View>
             </View>
           </View>
 
-          {/* Botones de acción */}
-          <View style={styles.actionsRow}>
-            <Pressable style={styles.declineBtn} onPress={onDecline}>
-              <Text style={styles.declineText}>Rechazar</Text>
+          <View style={styles.actions}>
+            <Pressable style={styles.rejectBtn} onPress={onReject}>
+              <Text style={styles.rejectText}>Rechazar</Text>
             </Pressable>
-
             <Pressable style={styles.acceptBtn} onPress={onAccept}>
-              <Text style={styles.acceptText}>ACEPTAR VIAJE</Text>
+              <Text style={styles.acceptText}>ACEPTAR</Text>
             </Pressable>
           </View>
         </View>
@@ -95,134 +69,39 @@ export default function RideRequestModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
     padding: 16,
     paddingBottom: 24,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 22,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  categoryBadge: {
-    fontSize: 12,
-    color: colors.muted,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  fare: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: colors.black,
-    marginTop: 2,
-  },
+  card: { backgroundColor: colors.surface, borderRadius: 22, padding: 20 },
+  timerTrack: { height: 6, borderRadius: 3, backgroundColor: '#EEE', overflow: 'hidden' },
+  timerBar: { height: 6, backgroundColor: colors.green },
+  timerText: { fontSize: 12, color: colors.muted, marginTop: 6, marginBottom: 12 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  category: { fontSize: 12, color: colors.muted, fontWeight: '700', textTransform: 'uppercase' },
+  fare: { fontSize: 26, fontWeight: '900', color: colors.black, marginTop: 2 },
+  earnings: { fontSize: 13, fontWeight: '700', color: colors.darkGreen, marginTop: 2 },
   etaBadge: {
     backgroundColor: colors.lightGreen,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
     alignItems: 'center',
+    alignSelf: 'flex-start',
   },
-  etaText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.darkGreen,
-  },
-  etaSub: {
-    fontSize: 11,
-    color: colors.darkGreen,
-    fontWeight: '600',
-  },
-  passengerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#F0F0F0',
-    marginBottom: 16,
-  },
-  passengerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.black,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  avatarLetter: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  passengerInfo: {
-    flex: 1,
-  },
-  passengerName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.black,
-  },
-  passengerRating: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  routeBox: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 20,
-  },
-  routeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  routeDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 12,
-  },
-  routeLine: {
-    width: 2,
-    height: 14,
-    backgroundColor: '#D0D5DD',
-    marginLeft: 4,
-    marginVertical: 3,
-  },
-  routeTextWrap: {
-    flex: 1,
-  },
-  routeLabel: {
-    fontSize: 10,
-    color: colors.muted,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  routeAddress: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.black,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  declineBtn: {
+  etaText: { fontSize: 16, fontWeight: '800', color: colors.darkGreen },
+  etaSub: { fontSize: 11, fontWeight: '600', color: colors.darkGreen },
+  passenger: { fontSize: 16, fontWeight: '800', color: colors.black, marginBottom: 12 },
+  routeBox: { backgroundColor: '#F9FAFB', borderRadius: 14, padding: 12, marginBottom: 20 },
+  routeItem: { flexDirection: 'row', alignItems: 'center' },
+  dot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
+  routeLine: { width: 2, height: 14, backgroundColor: '#D0D5DD', marginLeft: 4, marginVertical: 3 },
+  routeTextWrap: { flex: 1 },
+  routeLabel: { fontSize: 10, color: colors.muted, fontWeight: '700', textTransform: 'uppercase' },
+  address: { fontSize: 13, fontWeight: '700', color: colors.black },
+  actions: { flexDirection: 'row', gap: 12 },
+  rejectBtn: {
     flex: 1,
     height: 52,
     borderRadius: 12,
@@ -230,13 +109,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
   },
-  declineText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.muted,
-  },
+  rejectText: { fontSize: 15, fontWeight: '700', color: colors.muted },
   acceptBtn: {
     flex: 2,
     height: 52,
@@ -245,11 +119,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  acceptText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFF',
-    letterSpacing: 0.5,
-  },
+  acceptText: { fontSize: 15, fontWeight: '800', color: '#FFF' },
 });
-

@@ -1,28 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DriverMap from '../components/DriverMap';
 import AvailabilitySwitch from '../components/AvailabilitySwitch';
-import DriverMenuModal from '../components/DriverMenuModal';
 import RideRequestModal from '../components/RideRequestModal';
 import useDriverLocation from '../hooks/useDriverLocation';
-import {
-  getCurrentDriver,
-  subscribeToRideRequests,
-  updateDriverAvailability,
-  updateDriverLocation,
-  updateRideStatus,
-} from '../services/driverService';
+import useTripRequests from '../hooks/useTripRequests';
+import useEarnings from '../hooks/useEarnings';
+import { useSession } from '../context/SessionContext';
+import { useTrip } from '../context/TripContext';
+import { updateDriverAvailability, updateDriverLocation } from '../services/driverService';
+import { getPreference, setPreference } from '../services/preferences';
+import { formatCOP } from '../utils/format';
 import { colors } from '../theme/colors';
 
-export default function HomeScreen({ onOpenRegistration }) {
-  const [driver, setDriver] = useState(null);
+export default function HomeScreen({ navigation }) {
+  const { driver, refreshDriver } = useSession();
+  const { activeTrip, setActiveTrip } = useTrip();
   const [isAvailable, setIsAvailable] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [activeRideRequest, setActiveRideRequest] = useState(null);
-
   const mapRef = useRef(null);
-  const unsubscribeRef = useRef(null);
+  const driverId = driver?.id;
 
   const {
     location,
@@ -34,23 +32,12 @@ export default function HomeScreen({ onOpenRegistration }) {
     stopTracking,
   } = useDriverLocation();
 
-  const driverStatus = driver?.approvalStatus ?? 'pending';
+  const earnings = useEarnings(driverId);
 
-  useEffect(() => {
-    getCurrentDriver()
-      .then(setDriver)
-      .catch((error) => Alert.alert('Error', error.message));
-  }, []);
-
-  useEffect(() => {
-    if (!driver) return;
-
-    return () => {
-      stopTracking();
-      unsubscribeRef.current?.();
-      updateDriverAvailability(driver.id, false).catch(() => {});
-    };
-  }, [driver, stopTracking]);
+  const { request, secondsLeft, totalSeconds, accept, reject } = useTripRequests(
+    driverId,
+    isAvailable && !activeTrip
+  );
 
   const centerMap = (target, delta = 0.012) => {
     if (!target || !mapRef.current) return;
@@ -71,10 +58,13 @@ export default function HomeScreen({ onOpenRegistration }) {
   };
 
   const goOnline = async () => {
-    if (driverStatus !== 'approved') {
+    const current = await refreshDriver();
+    const status = current?.approvalStatus;
+
+    if (status !== 'approved') {
       Alert.alert(
         'Conexión no permitida',
-        driverStatus === 'rejected'
+        status === 'rejected'
           ? 'Tu cuenta fue rechazada. Contacta a soporte.'
           : 'Tu cuenta está en revisión. Podrás conectarte cuando aprueben tus documentos.'
       );
@@ -86,26 +76,21 @@ export default function HomeScreen({ onOpenRegistration }) {
       return;
     }
 
-    await updateDriverAvailability(driver.id, true);
-    await startTracking((coords) => updateDriverLocation(driver.id, coords));
-
-    unsubscribeRef.current?.();
-    unsubscribeRef.current = subscribeToRideRequests(driver.id, setActiveRideRequest);
-
+    await updateDriverAvailability(driverId, true);
+    await startTracking((coords) => updateDriverLocation(driverId, coords));
     centerMap(location, 0.01);
     setIsAvailable(true);
+    setPreference('lastAvailability', true);
   };
 
   const goOffline = async () => {
     stopTracking();
-    unsubscribeRef.current?.();
-    unsubscribeRef.current = null;
-    await updateDriverAvailability(driver.id, false);
+    await updateDriverAvailability(driverId, false);
     setIsAvailable(false);
+    setPreference('lastAvailability', false);
   };
 
   const handleToggleAvailability = async () => {
-    if (!driver) return;
     try {
       setIsActionLoading(true);
       if (isAvailable) await goOffline();
@@ -117,21 +102,35 @@ export default function HomeScreen({ onOpenRegistration }) {
     }
   };
 
-  const handleRide = async (status) => {
-    const request = activeRideRequest;
-    setActiveRideRequest(null);
+  const handleAccept = useCallback(async () => {
     try {
-      await updateRideStatus(request.id, status);
-      if (status === 'accepted') {
-        Alert.alert('¡Viaje aceptado!', 'Dirígete al punto de recogida.');
-      }
+      const trip = await accept();
+      setActiveTrip(trip);
     } catch (error) {
-      Alert.alert('Error', 'No se pudo actualizar el viaje.');
+      Alert.alert('Error', 'No se pudo aceptar el viaje. Puede que ya haya expirado.');
     }
-  };
+  }, [accept, setActiveTrip]);
+
+  useEffect(() => {
+    if (!activeTrip) return;
+    if (activeTrip.status === 'completed') navigation.navigate('TripSummary');
+    else navigation.navigate('Trip');
+  }, [activeTrip?.id]);
+
+  useEffect(() => {
+    getPreference('lastAvailability', false).then((wasAvailable) => {
+      if (wasAvailable) handleToggleAvailability();
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => stopTracking();
+  }, [stopTracking]);
+
+  if (!driver) return null;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <DriverMap
         mapRef={mapRef}
         location={location}
@@ -142,14 +141,14 @@ export default function HomeScreen({ onOpenRegistration }) {
         onCenterMap={handleCenterMap}
       />
 
-      <View style={styles.topNav}>
-        <Pressable style={styles.circleBtn} onPress={() => setMenuVisible(true)}>
+      <SafeAreaView style={styles.topNav} edges={['top']}>
+        <Pressable style={styles.circleBtn} onPress={() => navigation.openDrawer()}>
           <Text style={styles.menuIcon}>☰</Text>
         </Pressable>
 
-        <Pressable style={styles.earningsPill} onPress={() => setMenuVisible(true)}>
+        <Pressable style={styles.earningsPill} onPress={() => navigation.navigate('Ganancias')}>
           <Text style={styles.earningsIcon}>💵</Text>
-          <Text style={styles.earningsText}>$0 COP</Text>
+          <Text style={styles.earningsText}>{formatCOP(earnings.today.net)}</Text>
         </Pressable>
 
         <Pressable
@@ -158,28 +157,23 @@ export default function HomeScreen({ onOpenRegistration }) {
         >
           <Text style={styles.shieldIcon}>🛡️</Text>
         </Pressable>
-      </View>
+      </SafeAreaView>
 
       <AvailabilitySwitch
         isAvailable={isAvailable}
         isLoading={isActionLoading}
         onToggle={handleToggleAvailability}
-        driverStatus={driverStatus}
-      />
-
-      <DriverMenuModal
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        driverProfile={driver}
-        driverStatus={driverStatus}
-        onNavigateToRegistration={onOpenRegistration}
+        driverStatus={driver.approvalStatus}
+        todayEarnings={earnings.today.net}
+        todayTrips={earnings.today.trips}
       />
 
       <RideRequestModal
-        visible={Boolean(activeRideRequest)}
-        request={activeRideRequest}
-        onAccept={() => handleRide('accepted')}
-        onDecline={() => handleRide('rejected')}
+        trip={request}
+        secondsLeft={secondsLeft}
+        totalSeconds={totalSeconds}
+        onAccept={handleAccept}
+        onReject={reject}
       />
     </SafeAreaView>
   );
@@ -200,9 +194,10 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.surface },
   topNav: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 52 : 40,
+    top: 0,
     left: 18,
     right: 18,
+    paddingTop: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

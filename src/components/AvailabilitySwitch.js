@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { formatCOP } from '../utils/format';
 import { colors } from '../theme/colors';
 
 export default function AvailabilitySwitch({
@@ -6,6 +7,8 @@ export default function AvailabilitySwitch({
   isLoading,
   onToggle,
   driverStatus,
+  todayEarnings,
+  todayTrips,
 }) {
   const isApproved = driverStatus === 'approved';
 
@@ -34,12 +37,14 @@ export default function AvailabilitySwitch({
       <View style={styles.metricsRow}>
         <View style={styles.metricItem}>
           <Text style={styles.metricLabel}>Ganancias de hoy</Text>
-          <Text style={styles.metricValue}>$0 COP</Text>
+          <Text style={styles.metricValue}>{formatCOP(todayEarnings)}</Text>
         </View>
         <View style={styles.metricDivider} />
         <View style={styles.metricItem}>
           <Text style={styles.metricLabel}>Viajes completados</Text>
-          <Text style={styles.metricValue}>0 viajes</Text>
+          <Text style={styles.metricValue}>
+            {todayTrips} {todayTrips === 1 ? 'viaje' : 'viajes'}
+          </Text>
         </View>
       </View>
 

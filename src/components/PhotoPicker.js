@@ -2,38 +2,47 @@ import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../theme/colors';
 
-export default function PhotoPicker({
-  label,
-  value,
-  onChange,
-  error,
-  vehicle = false,
-  document = false,
-}) {
-  const choosePhoto = async () => {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          'Permiso requerido',
-          'Permite el acceso a tus fotos en la configuración para continuar.'
-        );
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.75,
-        allowsEditing: !vehicle && !document,
-        aspect: !vehicle && !document ? [1, 1] : undefined,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        onChange(result.assets[0].uri);
-      }
-    } catch (err) {
-      console.warn('Error al seleccionar imagen:', err);
-      Alert.alert('Error', 'No se pudo abrir la galería de fotos.');
-    }
+export default function PhotoPicker({ label, value, onChange, error, vehicle = false, document = false }) {
+  const isProfile = !vehicle && !document;
+
+  const options = {
+    mediaTypes: ['images'],
+    quality: 0.7,
+    allowsEditing: isProfile,
+    aspect: isProfile ? [1, 1] : undefined,
   };
+
+  const openCamera = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso requerido', 'Permite el acceso a la cámara en la configuración.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync(options);
+    if (!result.canceled) onChange(result.assets[0].uri);
+  };
+
+  const openGallery = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso requerido', 'Permite el acceso a tus fotos en la configuración.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync(options);
+    if (!result.canceled) onChange(result.assets[0].uri);
+  };
+
+  const choosePhoto = () => {
+    Alert.alert(label, '¿De dónde quieres tomar la foto?', [
+      { text: 'Cámara', onPress: openCamera },
+      { text: 'Galería', onPress: openGallery },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  };
+
+  let hint = 'Cámara o galería';
+  if (document) hint = 'Foto nítida y legible del documento';
+  if (vehicle) hint = 'Debe verse claramente la placa';
 
   return (
     <View style={styles.wrap}>
@@ -47,13 +56,7 @@ export default function PhotoPicker({
               <Text style={styles.cameraIcon}>📷</Text>
             </View>
             <Text style={styles.add}>Agregar foto</Text>
-            <Text style={styles.hint}>
-              {document
-                ? 'Foto nítida y legible del documento'
-                : vehicle
-                ? 'Debe verse claramente la placa'
-                : 'Desde tu galería'}
-            </Text>
+            <Text style={styles.hint}>{hint}</Text>
           </>
         )}
       </Pressable>
@@ -64,11 +67,7 @@ export default function PhotoPicker({
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 18 },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 7,
-  },
+  label: { fontSize: 14, fontWeight: '600', marginBottom: 7 },
   box: {
     height: 130,
     borderWidth: 1.5,
