@@ -1,4 +1,5 @@
--- Simula que un pasajero pide un viaje al último conductor registrado.
+-- Simula que un pasajero pide un viaje al conductor con el correo indicado.
+-- Cambia el correo de la última línea del where por el tuyo.
 -- El conductor debe estar aprobado y "Disponible" en la app para verlo.
 insert into public.trips (
   driver_id, passenger_name, origin, destination,
@@ -15,6 +16,7 @@ select
   'mercadopago'
 from public.drivers d
 join public.vehicles v on v.driver_id = d.id
-order by d.created_at desc
-limit 1
+where d.email = 'TU_CORREO@gmail.com'
 returning id, driver_id, status, category;
+ 
+tiene menú contextual

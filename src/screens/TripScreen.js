@@ -5,6 +5,7 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import PrimaryButton from '../components/PrimaryButton';
 import { useTrip } from '../context/TripContext';
+import useRouteSimulation from '../hooks/useRouteSimulation';
 import { getRoute } from '../services/routeService';
 import { updateTripStatus } from '../services/tripService';
 import { calculateFare } from '../config/pricing';
@@ -24,12 +25,15 @@ async function getCurrentPoint(fallback) {
  
 const toLatLng = (point) => ({ latitude: point.lat, longitude: point.lng });
  
+const SIMULATE_TRIP = process.env.EXPO_PUBLIC_SIMULATE_TRIP === 'true';
+ 
 export default function TripScreen({ navigation }) {
   const { activeTrip, setActiveTrip } = useTrip();
   const [route, setRoute] = useState(null);
   const [loadingRoute, setLoadingRoute] = useState(true);
   const [saving, setSaving] = useState(false);
   const mapRef = useRef(null);
+  const { position: carPosition } = useRouteSimulation(route?.coordinates, SIMULATE_TRIP);
  
   const status = activeTrip?.status;
   const goingToPickup = status === 'accepted' || status === 'driver_arriving';
@@ -133,7 +137,7 @@ export default function TripScreen({ navigation }) {
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
-        showsUserLocation
+        showsUserLocation={!SIMULATE_TRIP}
         initialRegion={{
           ...toLatLng(target),
           latitudeDelta: 0.05,
@@ -144,6 +148,11 @@ export default function TripScreen({ navigation }) {
         <Marker coordinate={toLatLng(activeTrip.destination)} title="Destino" />
         {route && (
           <Polyline coordinates={route.coordinates} strokeWidth={5} strokeColor={colors.blue} />
+        )}
+        {carPosition && (
+          <Marker coordinate={carPosition} anchor={{ x: 0.5, y: 0.5 }} title="Tu vehículo">
+            <Text style={styles.car}>🚗</Text>
+          </Marker>
         )}
       </MapView>
  
@@ -235,4 +244,5 @@ const styles = StyleSheet.create({
   cancel: { alignItems: 'center', paddingVertical: 14 },
   cancelText: { color: colors.error, fontWeight: '700' },
   finish: { backgroundColor: colors.green },
+  car: { fontSize: 28 },
 });
