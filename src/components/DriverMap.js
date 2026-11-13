@@ -1,15 +1,15 @@
 import { memo } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
-
+ 
 // Coordenadas seguras de fallback (centro de Bogotá) únicamente mientras se obtiene el GPS real
 const DEFAULT_FALLBACK_REGION = {
   latitude: 4.60971,
@@ -17,7 +17,7 @@ const DEFAULT_FALLBACK_REGION = {
   latitudeDelta: 0.015,
   longitudeDelta: 0.015,
 };
-
+ 
 function DriverMap({
   mapRef,
   location,
@@ -27,6 +27,10 @@ function DriverMap({
   onRequestPermission,
   onCenterMap,
 }) {
+  const insets = useSafeAreaInsets();
+  const belowNav = { top: insets.top + 66 };
+  const belowPill = { top: insets.top + 116 };
+ 
   const initialRegion = location
     ? {
         latitude: location.latitude,
@@ -35,13 +39,12 @@ function DriverMap({
         longitudeDelta: 0.012,
       }
     : DEFAULT_FALLBACK_REGION;
-
+ 
   return (
     <View style={styles.container}>
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_DEFAULT}
         initialRegion={initialRegion}
         showsUserLocation={false} // Usamos nuestro propio marcador de vehículo personalizado
         showsCompass={false}
@@ -75,18 +78,18 @@ function DriverMap({
           </Marker>
         )}
       </MapView>
-
+ 
       {/* Indicador de carga mientras se obtiene la posición satelital */}
       {isLoadingLocation && (
-        <View style={styles.loadingBanner}>
+        <View style={[styles.loadingBanner, belowPill]}>
           <ActivityIndicator size="small" color={colors.black} />
           <Text style={styles.loadingText}>Obteniendo tu ubicación GPS...</Text>
         </View>
       )}
-
+ 
       {/* Banner de error cuando los permisos son denegados */}
       {hasPermission === false && (
-        <View style={styles.errorBanner}>
+        <View style={[styles.errorBanner, belowPill]}>
           <Text style={styles.errorBannerText}>
             Permisos de ubicación desactivados. No puedes recibir viajes sin ubicación.
           </Text>
@@ -95,7 +98,7 @@ function DriverMap({
           </Pressable>
         </View>
       )}
-
+ 
       {/* Botón flotante para centrar mapa en ubicación actual */}
       <Pressable
         style={styles.recenterButton}
@@ -104,9 +107,9 @@ function DriverMap({
       >
         <Text style={styles.recenterIcon}>🎯</Text>
       </Pressable>
-
+ 
       {/* Píldora de estado en la parte superior del mapa */}
-      <View style={styles.topStatusContainer}>
+      <View style={[styles.topStatusContainer, belowNav]}>
         <View
           style={[
             styles.statusPill,
@@ -132,13 +135,13 @@ function DriverMap({
     </View>
   );
 }
-
+ 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
   },
   markerContainer: {
     alignItems: 'center',
@@ -180,7 +183,6 @@ const styles = StyleSheet.create({
   },
   topStatusContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 58 : 46,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -252,7 +254,6 @@ const styles = StyleSheet.create({
   },
   loadingBanner: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 110 : 96,
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
@@ -274,7 +275,6 @@ const styles = StyleSheet.create({
   },
   errorBanner: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 110 : 96,
     left: 20,
     right: 20,
     backgroundColor: '#FEF3F2',
@@ -309,6 +309,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
+ 
 export default memo(DriverMap);
-
+ 
