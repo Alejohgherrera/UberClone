@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { formatCOP } from '../utils/format';
 import { colors } from '../theme/colors';
 
 export default function AvailabilitySwitch({
@@ -6,6 +7,8 @@ export default function AvailabilitySwitch({
   isLoading,
   onToggle,
   driverStatus,
+  todayEarnings,
+  todayTrips,
 }) {
   const isApproved = driverStatus === 'approved';
 
@@ -34,12 +37,14 @@ export default function AvailabilitySwitch({
       <View style={styles.metricsRow}>
         <View style={styles.metricItem}>
           <Text style={styles.metricLabel}>Ganancias de hoy</Text>
-          <Text style={styles.metricValue}>$0.00 COP</Text>
+          <Text style={styles.metricValue}>{formatCOP(todayEarnings)}</Text>
         </View>
         <View style={styles.metricDivider} />
         <View style={styles.metricItem}>
           <Text style={styles.metricLabel}>Viajes completados</Text>
-          <Text style={styles.metricValue}>0 viajes</Text>
+          <Text style={styles.metricValue}>
+            {todayTrips} {todayTrips === 1 ? 'viaje' : 'viajes'}
+          </Text>
         </View>
       </View>
 
@@ -69,12 +74,7 @@ export default function AvailabilitySwitch({
             <ActivityIndicator color="#FFF" size="small" />
           ) : (
             <>
-              <View
-                style={[
-                  styles.btnIndicatorDot,
-                  isAvailable ? styles.btnDotOnline : styles.btnDotOffline,
-                ]}
-              />
+              <View style={styles.btnIndicatorDot} />
               <Text style={styles.actionBtnText}>
                 {isAvailable ? 'DESCONECTAR' : 'INICIAR'}
               </Text>
@@ -213,11 +213,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginRight: 8,
-  },
-  btnDotOffline: {
-    backgroundColor: '#FFF',
-  },
-  btnDotOnline: {
     backgroundColor: '#FFF',
   },
   actionBtnText: {

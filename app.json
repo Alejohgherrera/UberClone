@@ -36,12 +36,14 @@
         }
       ],
       [
-        "react-native-maps",
+        "expo-image-picker",
         {
-          "iosGoogleMapsApiKey": "AIzaSyD-yKzLG34AebGYiFMLAvYEfTBVNh9GZYQ",
-          "androidGoogleMapsApiKey": "AIzaSyD-yKzLG34AebGYiFMLAvYEfTBVNh9GZYQ"
+          "cameraPermission": "La aplicación usa la cámara para tomar tu foto de perfil, la del vehículo y tus documentos.",
+          "photosPermission": "La aplicación accede a tus fotos para cargar tu foto de perfil, la del vehículo y tus documentos."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-web-browser"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
